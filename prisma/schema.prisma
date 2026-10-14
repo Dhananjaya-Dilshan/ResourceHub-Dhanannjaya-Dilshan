@@ -1,0 +1,89 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// The lifecycle status of a resource.
+enum ResourceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// The lifecycle status of a reservation.
+enum ReservationStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+/// User role for authorization.
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+/// A registered application user.
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String   @db.Text
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  reservations Reservation[]
+
+  @@map("User")
+}
+
+/// A shared resource that can be reserved.
+model Resource {
+  id          String         @id @default(cuid())
+  name        String
+  type        String
+  description String?        @db.Text
+  location    String?
+  capacity    Int?
+  status      ResourceStatus @default(ACTIVE)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  reservations Reservation[]
+
+  @@index([status])
+  @@index([type])
+  @@index([status, type])
+  @@map("Resource")
+}
+
+/// A time-bounded booking of a Resource by a requester.
+model Reservation {
+  id            String            @id @default(cuid())
+  resourceId    String            @map("resource_id")
+  userId        String?           @map("user_id")
+  requesterName String            @map("requester_name")
+  purpose       String            @db.Text
+  startAt       DateTime          @map("start_at") @db.Timestamptz(6)
+  endAt         DateTime          @map("end_at") @db.Timestamptz(6)
+  status        ReservationStatus @default(CONFIRMED)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  resource Resource @relation(fields: [resourceId], references: [id])
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([resourceId])
+  @@index([userId])
+  @@index([startAt])
+  @@index([status])
+  @@index([status, startAt])
+  @@index([resourceId, status, startAt])
+  @@map("Reservation")
+}
